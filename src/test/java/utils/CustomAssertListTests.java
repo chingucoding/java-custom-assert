@@ -13,13 +13,31 @@ import static utils.CustomAssertTests.generateNestedObjects;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Stack;
 
 public class CustomAssertListTests {
 
 	@Test
 	public void listOfPrimitivesWithSameValuesAreEqual() {
 		assertObjectsEqual(List.of('A', 'B', 'C'), List.of('A', 'B', 'C'));
+	}
+
+	@Test
+	public void listWithNullsAndListWithoutNullsAreNotEqual() {
+		try {
+			var normalList = new ArrayList<>();
+			normalList.add('A');
+			var nullContainingList = new ArrayList<>();
+			nullContainingList.add(null);
+			assertObjectsEqual(normalList, nullContainingList);
+			fail("Expected AssertionError");
+		} catch (AssertionError e) {
+			// Message is: "Expected '[0]' to be not null but was null."
+			assertTrue(e.getMessage().contains("Expected '[0]' to be not null but was null."), "Message should contain path");
+			assertTrue(e.getMessage().contains("not null"), "Message should contain the error type");
+		}
 	}
 
 	@Test

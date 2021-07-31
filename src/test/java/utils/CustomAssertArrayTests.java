@@ -18,6 +18,20 @@ public class CustomAssertArrayTests {
 	}
 
 	@Test
+	public void arrayWithNullsAndArrayWithoutNullsAreNotEqual() {
+		try {
+			var normalArray = new String[]{"test"};
+			var nullContainingArray = new String[]{null};
+			assertObjectsEqual(normalArray, nullContainingArray);
+			fail("Expected AssertionError");
+		} catch (AssertionError e) {
+			// Message is: "Expected '[0]' to be not null but was null."
+			assertTrue(e.getMessage().contains("Expected '[0]' to be not null but was null."), "Message should contain path");
+			assertTrue(e.getMessage().contains("not null"), "Message should contain the error type");
+		}
+	}
+
+	@Test
 	public void arrayOfDifferentSizesAreNotEqual() {
 		try {
 			assertObjectsEqual(new char[] { 'A', 'B', 'C' }, new char[] { 'A', 'B' });

@@ -34,12 +34,10 @@ public class CustomAssert {
         }
     }
 
-    private static boolean generateErrorsFromComparison(Object expected, Object actual, StringBuilder messageBuilder, String currentScope) {
+    private static boolean generateErrorsFromComparison(Object expected, Object actual, StringBuilder messageBuilder,
+            String currentScope) {
         var foundError = false;
-        if(findErrorsNullChecks(expected, actual, messageBuilder, currentScope)){
-            return true;
-        }
-        if(findErrorsCollections(expected, actual, messageBuilder, currentScope)){
+        if (findErrorsCollections(expected, actual, messageBuilder, currentScope)) {
             foundError = true;
         }
         final var fields = expected.getClass().getDeclaredFields();
@@ -50,21 +48,30 @@ public class CustomAssert {
                 final var actualPropertyValue = field.get(actual);
 
                 // Skip null properties
-                if(expectedPropertyValue == null && actualPropertyValue == null) {
+                if (expectedPropertyValue == null && actualPropertyValue == null) {
                     continue;
                 }
 
-                if(findErrorsNullChecks(expectedPropertyValue, actualPropertyValue, messageBuilder, currentScope + "." + field.getName())){
+                if (findErrorsNullChecks(expectedPropertyValue, actualPropertyValue, messageBuilder,
+                        currentScope + "." + field.getName())) {
                     foundError = true;
                     continue;
                 }
 
-                if(isPrimitiveOrPrimitiveWrapper(field)){
-                    if(findErrorsValueComparison(expectedPropertyValue, actualPropertyValue, messageBuilder, currentScope + "." + field.getName())){
+                if(findErrorsOfTypes(expectedPropertyValue, actualPropertyValue, messageBuilder,
+                        currentScope + "." + field.getName())) {
+                    foundError = true;
+                    continue;
+                }
+
+                if (isPrimitiveOrPrimitiveWrapper(field) || isPrimitiveOrPrimitiveWrapper(expectedPropertyValue.getClass()) || isPrimitiveOrPrimitiveWrapper(actualPropertyValue.getClass())) {
+                    if (findErrorsValueComparison(expectedPropertyValue, actualPropertyValue, messageBuilder,
+                            currentScope + "." + field.getName())) {
                         foundError = true;
                     }
-                }else{
-                    if(generateErrorsFromComparison(expectedPropertyValue, actualPropertyValue, messageBuilder, currentScope + "." + field.getName())) {
+                } else {
+                    if (generateErrorsFromComparison(expectedPropertyValue, actualPropertyValue, messageBuilder,
+                            currentScope + "." + field.getName())) {
                         foundError = true;
                     }
                 }
@@ -75,89 +82,95 @@ public class CustomAssert {
         return foundError;
     }
 
-    private static boolean findErrorsNullChecks(Object expectedPropertyValue, Object actualPropertyValue, StringBuilder messageBuilder, String currentScope) {
+    private static boolean findErrorsNullChecks(Object expectedPropertyValue, Object actualPropertyValue,
+            StringBuilder messageBuilder, String currentScope) {
         if (expectedPropertyValue == null && actualPropertyValue != null) {
-            messageBuilder.append("Expected '").append(currentScope)
-                    .append("' to be null but was not null.").append(System.getProperty("line.separator"));
+            messageBuilder.append("Expected '").append(currentScope).append("' to be null but was not null.")
+                    .append(System.getProperty("line.separator"));
             return true;
         }
         if (expectedPropertyValue != null && actualPropertyValue == null) {
-            messageBuilder.append("Expected '").append(currentScope)
-                    .append("' to be not null but was null.").append(System.getProperty("line.separator"));
+            messageBuilder.append("Expected '").append(currentScope).append("' to be not null but was null.")
+                    .append(System.getProperty("line.separator"));
             return true;
         }
         return false;
     }
 
-    private static boolean findErrorsCollections(Object expectedPropertyValue, Object actualPropertyValue, StringBuilder messageBuilder, String currentScope) {
+    private static boolean findErrorsCollections(Object expectedPropertyValue, Object actualPropertyValue,
+            StringBuilder messageBuilder, String currentScope) {
         var foundError = false;
-        if(expectedPropertyValue == null || actualPropertyValue == null) {
+        if (!isCollection(expectedPropertyValue) && !isCollection(actualPropertyValue)) {
             return false;
         }
-        if(expectedPropertyValue.getClass() != actualPropertyValue.getClass()) {
-            return false;
-        }
-        if(expectedPropertyValue.getClass().isArray()) {
+        if (expectedPropertyValue.getClass().isArray()) {
             final var expectedLength = Array.getLength(expectedPropertyValue);
             final var actualLength = Array.getLength(actualPropertyValue);
-            final var isPrimitiveArray = isPrimitiveOrPrimitiveWrapper(expectedPropertyValue.getClass().getComponentType());
-            if(expectedLength != actualLength) {
-                messageBuilder.append("Expected '")
-                    .append(currentScope)
-                    .append("' to be of length ")
-                    .append(expectedLength)
-                    .append(" but was of length ")
-                    .append(actualLength)
-                    .append(".")
-                    .append(System.getProperty("line.separator"));
+            final var isPrimitiveArray = isPrimitiveOrPrimitiveWrapper(
+                    expectedPropertyValue.getClass().getComponentType());
+            if (expectedLength != actualLength) {
+                messageBuilder.append("Expected '").append(currentScope).append("' to be of length ")
+                        .append(expectedLength).append(" but was of length ").append(actualLength).append(".")
+                        .append(System.getProperty("line.separator"));
                 return true;
             }
-            for(int i = 0; i < expectedLength; i++) {
+            for (int i = 0; i < expectedLength; i++) {
                 final var expectedPropertyValueAtIndex = Array.get(expectedPropertyValue, i);
                 final var actualPropertyValueAtIndex = Array.get(actualPropertyValue, i);
-                if(isPrimitiveArray) {
-                    if(findErrorsValueComparison(expectedPropertyValueAtIndex, actualPropertyValueAtIndex, messageBuilder, currentScope + "[" + i + "]")){
+                if (findErrorsNullChecks(expectedPropertyValueAtIndex, actualPropertyValueAtIndex, messageBuilder,
+                        currentScope + "[" + i + "]")) {
+                    foundError = true;
+                    continue;
+                }
+                if (isPrimitiveArray) {
+                    if (findErrorsValueComparison(expectedPropertyValueAtIndex, actualPropertyValueAtIndex,
+                            messageBuilder, currentScope + "[" + i + "]")) {
                         foundError = true;
                     }
-                }else{
-                    if(generateErrorsFromComparison(expectedPropertyValueAtIndex, actualPropertyValueAtIndex, messageBuilder, currentScope + "[" + i + "]")) {
+                } else {
+                    if (generateErrorsFromComparison(expectedPropertyValueAtIndex, actualPropertyValueAtIndex,
+                            messageBuilder, currentScope + "[" + i + "]")) {
                         foundError = true;
                     }
                 }
             }
         }
-        if(expectedPropertyValue instanceof final List expectedPropertyValueAsList) {
+        if (expectedPropertyValue instanceof final List expectedPropertyValueAsList) {
             final var actualPropertyValueAsList = (List) actualPropertyValue;
-            if(expectedPropertyValueAsList.size() != actualPropertyValueAsList.size()) {
-                messageBuilder.append("Expected '")
-                    .append(currentScope)
-                    .append("' to be of size ")
-                    .append(expectedPropertyValueAsList.size())
-                    .append(" but was of size ")
-                    .append(actualPropertyValueAsList.size())
-                    .append(".")
-                    .append(System.getProperty("line.separator"));
+            if (expectedPropertyValueAsList.size() != actualPropertyValueAsList.size()) {
+                messageBuilder.append("Expected '").append(currentScope).append("' to be of size ")
+                        .append(expectedPropertyValueAsList.size()).append(" but was of size ")
+                        .append(actualPropertyValueAsList.size()).append(".")
+                        .append(System.getProperty("line.separator"));
                 return true;
             }
             // Compare index by index
-            if(expectedPropertyValueAsList.size() > 0) {
-                final var isPrimitiveList = isPrimitiveOrPrimitiveWrapper(expectedPropertyValueAsList.get(0).getClass());
+            if (expectedPropertyValueAsList.size() > 0) {
+                final var isPrimitiveList = isPrimitiveOrPrimitiveWrapper(
+                        expectedPropertyValueAsList.get(0).getClass());
 
-                for(int i=0;i< expectedPropertyValueAsList.size();i++) {
+                for (int i = 0; i < expectedPropertyValueAsList.size(); i++) {
                     final var expectedPropertyValueAtIndex = expectedPropertyValueAsList.toArray()[i];
                     final var actualPropertyValueAtIndex = actualPropertyValueAsList.toArray()[i];
-                    if(isPrimitiveList) {
-                        if(findErrorsValueComparison(expectedPropertyValueAtIndex, actualPropertyValueAtIndex, messageBuilder, currentScope + "[" + i + "]")){
+                    if (findErrorsNullChecks(expectedPropertyValueAtIndex, actualPropertyValueAtIndex, messageBuilder,
+                            currentScope + "[" + i + "]")) {
+                        foundError = true;
+                        continue;
+                    }
+                    if (isPrimitiveList) {
+                        if (findErrorsValueComparison(expectedPropertyValueAtIndex, actualPropertyValueAtIndex,
+                                messageBuilder, currentScope + "[" + i + "]")) {
                             foundError = true;
                         }
-                    }else{
-                        if(generateErrorsFromComparison(expectedPropertyValueAtIndex, actualPropertyValueAtIndex, messageBuilder, currentScope + "[" + i + "]")) {
+                    } else {
+                        if (generateErrorsFromComparison(expectedPropertyValueAtIndex, actualPropertyValueAtIndex,
+                                messageBuilder, currentScope + "[" + i + "]")) {
                             foundError = true;
                         }
                     }
                 }
             }
-        }else if(expectedPropertyValue instanceof final Iterable expectedPropertyValueAsIterable) {
+        } else if (expectedPropertyValue instanceof final Iterable expectedPropertyValueAsIterable) {
             final var actualPropertyValueAsIterable = (Iterable) actualPropertyValue;
 
             var firstSize = 0;
@@ -169,50 +182,44 @@ public class CustomAssert {
                 secondSize++;
             }
 
-            if(firstSize != secondSize) {
-                messageBuilder.append("Expected '")
-                .append(currentScope)
-                .append("' to be of size ")
-                .append(firstSize)
-                .append(" but was of size ")
-                .append(secondSize)
-                .append(".")
-                .append(System.getProperty("line.separator"));
+            if (firstSize != secondSize) {
+                messageBuilder.append("Expected '").append(currentScope).append("' to be of size ").append(firstSize)
+                        .append(" but was of size ").append(secondSize).append(".")
+                        .append(System.getProperty("line.separator"));
                 return true;
             }
-            
-            final var symmetricDifference = findSymmetricDifference(expectedPropertyValueAsIterable, actualPropertyValueAsIterable);
-            if(symmetricDifference.size() > 0) {
-                messageBuilder.append("Expected '")
-                    .append(currentScope)
-                    .append("' to contain same items, however ")
-                    .append(symmetricDifference.size())
-                    .append(" items were different: ")
-                    .append(symmetricDifference)
-                    .append(".")
-                    .append(System.getProperty("line.separator"));
+
+            final var symmetricDifference = findSymmetricDifference(expectedPropertyValueAsIterable,
+                    actualPropertyValueAsIterable);
+            if (symmetricDifference.size() > 0) {
+                messageBuilder.append("Expected '").append(currentScope).append("' to contain same items, however ")
+                        .append(symmetricDifference.size()).append(" items were different: ")
+                        .append(symmetricDifference).append(".").append(System.getProperty("line.separator"));
                 foundError = true;
             }
         }
         return foundError;
     }
 
-    private static boolean findErrorsValueComparison(Object expectedPropertyValue, Object actualPropertyValue, StringBuilder messageBuilder, String currentScope) {
-        if(expectedPropertyValue == null || actualPropertyValue == null) {
-            return false;
-        }
-        if (expectedPropertyValue.getClass() != actualPropertyValue.getClass()) {
-            messageBuilder.append(currentScope).append("Expected '").append(currentScope).append("' to be of type '")
-                    .append(expectedPropertyValue.getClass().getName()).append("' but was of type '")
-                    .append(actualPropertyValue.getClass().getName()).append("'.")
+    private static boolean findErrorsValueComparison(Object expectedPropertyValue, Object actualPropertyValue,
+            StringBuilder messageBuilder, String currentScope) {
+        // Only compare if primitives, enum or string
+        if (!expectedPropertyValue.equals(actualPropertyValue)) {
+            messageBuilder.append("Expected '").append(currentScope).append("' to be '").append(expectedPropertyValue)
+                    .append("' but was '").append(actualPropertyValue).append("'.")
                     .append(System.getProperty("line.separator"));
             return true;
         }
-        // Only compare if primitives, enum or string
-        if (!expectedPropertyValue.equals(actualPropertyValue)) {
-            messageBuilder.append("Expected '").append(currentScope)
-                    .append("' to be '").append(expectedPropertyValue).append("' but was '").append(actualPropertyValue)
-                    .append("'.").append(System.getProperty("line.separator"));
+        return false;
+    }
+
+    private static boolean findErrorsOfTypes(Object expectedPropertyValue, Object actualPropertyValue,
+            StringBuilder messageBuilder, String currentScope) {
+        if (expectedPropertyValue.getClass() != actualPropertyValue.getClass()) {
+            messageBuilder.append("Expected '").append(currentScope).append("' to be of type '")
+            .append(expectedPropertyValue.getClass().getName()).append("' but was of type '")
+            .append(actualPropertyValue.getClass().getName()).append("'.")
+            .append(System.getProperty("line.separator"));
             return true;
         }
         return false;
@@ -227,36 +234,48 @@ public class CustomAssert {
     }
 
     private static boolean isPrimitiveOrPrimitiveWrapper(Class<?> field) {
-        return field.isPrimitive() || field.isEnum() || field.equals(String.class)||
-        field == Double.class || field == Float.class || field == Long.class ||
-        field == Integer.class || field == Short.class || field == Character.class ||
-        field == Byte.class || field == Boolean.class;
+        return field.isPrimitive() || field.isEnum() || field.equals(String.class) || field == Double.class
+                || field == Float.class || field == Long.class || field == Integer.class || field == Short.class
+                || field == Character.class || field == Byte.class || field == Boolean.class;
+    }
+
+    private static boolean isCollection(Object object) {
+        if (object.getClass().isArray()) {
+            return true;
+        }
+        if (object instanceof List) {
+            return true;
+        }
+        if (object instanceof Iterable) {
+            return true;
+        }
+        return false;
     }
 
     @SuppressWarnings("DuplicatedCode")
     private static Set<Object> findSymmetricDifference(Iterable firstIterable, Iterable secondIterable) {
         var symmetricDifference = new HashSet<>();
-        for(var firstIterableItem : firstIterable) {
-                var found = false;
-                for(var secondIterableItem : secondIterable) {
-                    if(firstIterableItem.equals(secondIterableItem)) {
-                        found = true;
-                        break;
-                    }
-                }
-                if(!found) {
-                    symmetricDifference.add(firstIterableItem);
-                }
-            }
-        for(var secondIterableItem : secondIterable) {
+        for (var firstIterableItem : firstIterable) {
             var found = false;
-            for(var firstIterableItem : firstIterable) {
-                if(firstIterableItem.equals(secondIterableItem)) {
+            for (var secondIterableItem : secondIterable) {
+                if (firstIterableItem.equals(secondIterableItem)) {
                     found = true;
                     break;
                 }
             }
-            if(!found) {
+            if (!found) {
+                symmetricDifference.add(firstIterableItem);
+            }
+        }
+        for (var secondIterableItem : secondIterable) {
+            var found = false;
+            for (var firstIterableItem : firstIterable) {
+                if (firstIterableItem.equals(secondIterableItem)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
                 symmetricDifference.add(secondIterableItem);
             }
         }
