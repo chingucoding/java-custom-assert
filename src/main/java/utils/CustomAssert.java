@@ -77,12 +77,12 @@ public class CustomAssert {
 
     private static boolean findErrorsNullChecks(Object expectedPropertyValue, Object actualPropertyValue, StringBuilder messageBuilder, String currentScope) {
         if (expectedPropertyValue == null && actualPropertyValue != null) {
-            messageBuilder.append("Expected '").append(currentScope).append(".")
+            messageBuilder.append("Expected '").append(currentScope)
                     .append("' to be null but was not null.").append(System.getProperty("line.separator"));
             return true;
         }
         if (expectedPropertyValue != null && actualPropertyValue == null) {
-            messageBuilder.append("Expected '").append(currentScope).append(".")
+            messageBuilder.append("Expected '").append(currentScope)
                     .append("' to be not null but was null.").append(System.getProperty("line.separator"));
             return true;
         }
